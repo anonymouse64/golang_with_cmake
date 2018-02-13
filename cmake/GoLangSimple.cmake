@@ -20,6 +20,8 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 
 	# This is for tracking changes to the original go file
 	get_filename_component(MAIN_SRC_ABS ${GO_PROGRAM_MAIN_SOURCE} ABSOLUTE)
+	get_filename_component(MAIN_SRC_ABS_DIR ${MAIN_SRC_ABS} DIRECTORY)
+	get_filename_component(MAIN_SRC_DIR ${GO_PROGRAM_MAIN_SOURCE} DIRECTORY)
 
 	# Add the target for copying the files over
 	add_custom_target(${GO_PROGRAM_TARGET}_copy)
@@ -63,11 +65,23 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 
 	# Now check if we should add tests for this executable
 	string(REGEX REPLACE "\\.[^.]*$" "" GO_PROGRAM_MAIN_SOURCE_ROOT_FILE ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE})
-	if(EXISTS ${GO_PROGRAM_MAIN_SOURCE_ROOT_FILE}_test.go)
-		message(STATUS "Found go test file : ${GO_PROGRAM_MAIN_SOURCE_ROOT_FILE}_test.go")
+	set(GO_PROGRAM_MAIN_SOURCE_TEST_FILE ${GO_PROGRAM_MAIN_SOURCE_ROOT_FILE}_test.go)
+	if(EXISTS ${GO_PROGRAM_MAIN_SOURCE_TEST_FILE})
+		get_filename_component(GO_PROGRAM_TEST_FILE_NAME ${GO_PROGRAM_MAIN_SOURCE_TEST_FILE} NAME)
+		message(STATUS "Found go test file : ${MAIN_SRC_DIR}/${GO_PROGRAM_TEST_FILE_NAME}")
 		message(STATUS "Enabling testing for ${GO_PROGRAM_TARGET}")
+		# Add a dummy test command to copy the test file over 
+		add_test(NAME ${GO_PROGRAM_TARGET}Test_copy
+			COMMAND "${CMAKE_COMMAND}" -E
+			copy ${MAIN_SRC_ABS_DIR}/${GO_PROGRAM_TEST_FILE_NAME} ${GO_PROGRAM_GOPATH}/${MAIN_SRC_DIR}/${GO_PROGRAM_TEST_FILE_NAME})
+
+		# Finally add the test
 		add_test(NAME ${GO_PROGRAM_TARGET}Test
 			COMMAND env GOPATH=${GOPATH} go test -cover
 			WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR})
+
+		# Make the test target dependent on the copy target
+		set_tests_properties(${GO_PROGRAM_TARGET}Test PROPERTIES 
+			DEPENDS ${GO_PROGRAM_TARGET}Test_copy)
 	endif()
 endfunction(ADD_GO_INSTALLABLE_PROGRAM)
