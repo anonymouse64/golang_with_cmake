@@ -40,7 +40,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	endforeach(SourceDir)
 
 	# Add the actual build target
-	add_custom_target(${GO_PROGRAM_TARGET})
+	add_custom_target(${GO_PROGRAM_TARGET} ALL)
 	add_dependencies(${GO_PROGRAM_TARGET} ${GO_PROGRAM_TARGET}_copy) 
 
 	# First before building the target, we automatically fetch all of the dependencies declared 
@@ -57,9 +57,6 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 		${CMAKE_GO_FLAGS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH}
 		DEPENDS ${GO_PROGRAM_TARGET}_copy)
-
-	# Add this target so it builds with the all target
-	add_custom_target(${GO_PROGRAM_TARGET}_all ALL DEPENDS ${GO_PROGRAM_TARGET})
 
 	# Install the executable
 	install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET} DESTINATION bin)
