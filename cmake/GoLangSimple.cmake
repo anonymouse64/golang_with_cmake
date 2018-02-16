@@ -18,7 +18,7 @@ set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${GOPATH} ${G
 function(ADD_GO_INSTALLABLE_PROGRAM)
 	# First parse the arguments
 	set(oneValueArgs TARGET MAIN_SOURCE IMPORT_PATH)
-	set(multiValueArgs SOURCE_DIRECTORIES)
+	set(multiValueArgs SOURCE_DIRECTORIES TEST_PACKAGES)
 	cmake_parse_arguments(GO_PROGRAM "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
 
 	# This variable tracks the copy of the main file inside the gopath
@@ -71,9 +71,16 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET} DESTINATION bin)
 
 	# Now check if we should add tests for this executable
-	string(REGEX REPLACE "\\.[^.]*$" "" GO_PROGRAM_MAIN_SOURCE_ROOT_FILE ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE})
+	string(REGEX REPLACE "\\.[^.]*$" "" GO_PROGRAM_MAIN_SOURCE_ROOT_FILE ${CMAKE_SOURCE_DIR}/${GO_PROGRAM_MAIN_SOURCE})
 	set(GO_PROGRAM_MAIN_SOURCE_TEST_FILE ${GO_PROGRAM_MAIN_SOURCE_ROOT_FILE}_test.go)
 	if(EXISTS ${GO_PROGRAM_MAIN_SOURCE_TEST_FILE})
+		# This is to support multiple packages being specified for a single cover profile with go test
+		# but requires golang 1.10, see https://github.com/golang/go/issues/6909
+		# Then the call to go test can use the variable GO_PROGRAM_FULL_TEST_PACKAGES and get more accurate testing results
+		set(GO_PROGRAM_FULL_TEST_PACKAGES "")
+		foreach(test_pkg ${GO_PROGRAM_TEST_PACKAGES})
+			list(APPEND GO_PROGRAM_FULL_TEST_PACKAGES ${GO_PROGRAM_IMPORT_PATH}/${test_pkg})
+		endforeach(test_pkg)
 		get_filename_component(GO_PROGRAM_TEST_FILE_NAME ${GO_PROGRAM_MAIN_SOURCE_TEST_FILE} NAME)
 		message(STATUS "Found go test file : ${MAIN_SRC_DIR}/${GO_PROGRAM_TEST_FILE_NAME}")
 		message(STATUS "Enabling testing for ${GO_PROGRAM_TARGET}")
@@ -82,9 +89,14 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 			COMMAND "${CMAKE_COMMAND}" -E
 			copy ${MAIN_SRC_ABS_DIR}/${GO_PROGRAM_TEST_FILE_NAME} ${GO_PROGRAM_GOPATH}/${MAIN_SRC_DIR}/${GO_PROGRAM_TEST_FILE_NAME})
 
-		# Finally add the test
+		# Add the go test command
 		add_test(NAME ${GO_PROGRAM_TARGET}Test
-			COMMAND env GOPATH=${GOPATH} go test -cover
+			COMMAND env GOPATH=${GOPATH} go test ${GO_PROGRAM_FULL_TEST_PACKAGES} -coverprofile=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
+			WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR})
+
+		# Also add a coverage html generation output - this will generate coverage statistics in a HTML viewer of the code
+		add_test(NAME ${GO_PROGRAM_TARGET}coverage
+			COMMAND env GOPATH=${GOPATH} go tool cover -o ${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}.html -html=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
 			WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR})
 
 		# Make the test target dependent on the copy target
