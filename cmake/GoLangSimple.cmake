@@ -8,6 +8,13 @@ enable_testing()
 set(GOPATH "${CMAKE_CURRENT_BINARY_DIR}/go")
 file(MAKE_DIRECTORY ${GOPATH})
 
+set(GO_COVERAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/coverage")
+file(MAKE_DIRECTORY ${GO_COVERAGE_DIRECTORY})
+
+# Make sure to clean up the gopath and the go coverage directory
+set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${GOPATH} ${GO_COVERAGE_DIRECTORY})
+
+# ADD_GO_INSTALLABLE_PROGRAM allows for adding a new go progam target
 function(ADD_GO_INSTALLABLE_PROGRAM)
 	# First parse the arguments
 	set(oneValueArgs TARGET MAIN_SOURCE IMPORT_PATH)
