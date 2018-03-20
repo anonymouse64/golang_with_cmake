@@ -17,8 +17,9 @@ set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${GOPATH} ${G
 # ADD_GO_INSTALLABLE_PROGRAM allows for adding a new go progam target
 function(ADD_GO_INSTALLABLE_PROGRAM)
 	# First parse the arguments
+	set(options CONFIGURE_FILE)
 	set(oneValueArgs TARGET MAIN_SOURCE IMPORT_PATH)
-	set(multiValueArgs SOURCE_DIRECTORIES TEST_PACKAGES)
+	set(multiValueArgs SOURCE_DIRECTORIES TEST_PACKAGES BUILD_ENVIRONMENT GET_ENVIRONMENT)
 	cmake_parse_arguments(GO_PROGRAM "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
 
 	# This variable tracks the copy of the main file inside the gopath
@@ -33,12 +34,18 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	# Add the target for copying the files over
 	add_custom_target(${GO_PROGRAM_TARGET}_copy)
 
-	# First copy over the individual source file for this executable
-	add_custom_command(TARGET ${GO_PROGRAM_TARGET}_copy
-		COMMAND ${CMAKE_COMMAND} -E
-		copy ${MAIN_SRC_ABS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
-		# The copy command depends on the original source file
-		DEPENDS ${MAIN_SRC_ABS})
+	# First copy over the individual source file for this executable only if CONFIGURE_FILE isn't true
+	# otherwise we configure the file and output it to the gopath
+	if(${GO_PROGRAM_CONFIGURE_FILE})
+		message(STATUS "Configuring file ${GO_PROGRAM_MAIN_SOURCE}")
+		configure_file("${GO_PROGRAM_MAIN_SOURCE}" "${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}")
+	else()
+		add_custom_command(TARGET ${GO_PROGRAM_TARGET}_copy
+			COMMAND ${CMAKE_COMMAND} -E
+			copy ${MAIN_SRC_ABS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
+			# The copy command depends on the original source file
+			DEPENDS ${MAIN_SRC_ABS})
+	endif()
 
 	# Now copy the specified source directories over into the gopath
 	foreach(SourceDir ${GO_PROGRAM_SOURCE_DIRECTORIES})
@@ -50,18 +57,18 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 
 	# Add the actual build target
 	add_custom_target(${GO_PROGRAM_TARGET} ALL)
-	add_dependencies(${GO_PROGRAM_TARGET} ${GO_PROGRAM_TARGET}_copy) 
+	add_dependencies(${GO_PROGRAM_TARGET} ${GO_PROGRAM_TARGET}_copy)
 
 	# First before building the target, we automatically fetch all of the dependencies declared 
 	# in the go file using go get
 	add_custom_command(TARGET ${GO_PROGRAM_TARGET}
-		COMMAND env GOPATH=${GOPATH} go get -d -t ./...
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_GET_ENVIRONMENT} GOPATH=${GOPATH} go get -v -d -t ./...
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR}
 		DEPENDS ${GO_PROGRAM_TARGET}_copy)
 
 	# Now actually setup the build to go build the file inside of the gopath
 	add_custom_command(TARGET ${GO_PROGRAM_TARGET}
-		COMMAND env GOPATH=${GOPATH} go build 
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_BUILD_ENVIRONMENT} GOPATH=${GOPATH} go build -v 
 		-o "${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET}"
 		${CMAKE_GO_FLAGS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH}
@@ -91,12 +98,12 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 
 		# Add the go test command
 		add_test(NAME ${GO_PROGRAM_TARGET}Test
-			COMMAND env GOPATH=${GOPATH} go test ${GO_PROGRAM_FULL_TEST_PACKAGES} -coverprofile=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
+			COMMAND ${CMAKE_COMMAND} -E env GOPATH=${GOPATH} go test ${GO_PROGRAM_FULL_TEST_PACKAGES} -coverprofile=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
 			WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR})
 
 		# Also add a coverage html generation output - this will generate coverage statistics in a HTML viewer of the code
 		add_test(NAME ${GO_PROGRAM_TARGET}coverage
-			COMMAND env GOPATH=${GOPATH} go tool cover -o ${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}.html -html=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
+			COMMAND ${CMAKE_COMMAND} -E env GOPATH=${GOPATH} go tool cover -o ${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}.html -html=${GO_COVERAGE_DIRECTORY}/${GO_PROGRAM_TARGET}coverage.out
 			WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR})
 
 		# Make the test target dependent on the copy target
