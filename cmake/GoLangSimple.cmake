@@ -55,7 +55,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 	endforeach(SourceDir)
 
-	# Add the actual build target
+	# Add the actual build target which depends on the source directories being updated
 	add_custom_target(${GO_PROGRAM_TARGET} ALL)
 	add_dependencies(${GO_PROGRAM_TARGET} ${GO_PROGRAM_TARGET}_copy)
 
@@ -78,6 +78,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET} DESTINATION bin)
 
 	# Now check if we should add tests for this executable
+	# This regex deletes the file extension so we can append _test.go to see if that test file exists
 	string(REGEX REPLACE "\\.[^.]*$" "" GO_PROGRAM_MAIN_SOURCE_ROOT_FILE ${CMAKE_SOURCE_DIR}/${GO_PROGRAM_MAIN_SOURCE})
 	set(GO_PROGRAM_MAIN_SOURCE_TEST_FILE ${GO_PROGRAM_MAIN_SOURCE_ROOT_FILE}_test.go)
 	if(EXISTS ${GO_PROGRAM_MAIN_SOURCE_TEST_FILE})
