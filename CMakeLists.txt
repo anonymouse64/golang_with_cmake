@@ -1,7 +1,7 @@
 project(golang-with-cmake-example)
 cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
-include("cmake/GoLangSimple.cmake")
+include("cmake/Golang.cmake")
 
 # Add the main target executable
 ADD_GO_INSTALLABLE_PROGRAM(TARGET example-executable

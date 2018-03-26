@@ -55,6 +55,9 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 	endforeach(SourceDir)
 
+	# We don't need to show the progress for copying files
+	set_target_properties(${GO_PROGRAM_TARGET}_copy PROPERTIES RULE_MESSAGES OFF)
+
 	# Add the actual build target which depends on the source directories being updated
 	add_custom_target(${GO_PROGRAM_TARGET} ALL)
 	add_dependencies(${GO_PROGRAM_TARGET} ${GO_PROGRAM_TARGET}_copy)
@@ -151,8 +154,8 @@ function(ADD_GO_PACKAGE_FOLDER)
 			# This package item wasn't in the list of files to be configured, so if it's not a directory we should add it to the list of things to copy
 			# If it's a directory we don't want to copy it, as copying in a directory may inadvertantly copy in any configure files
 			if(NOT IS_DIRECTORY  ${PackageItem})
-				get_filename_component(ABSOLUTE_PACKAGE_FILE ${PackageItem} ABSOLUTE)
-				list(APPEND GO_PACKAGE_COPY_FILES ${ABSOLUTE_PACKAGE_FILE})
+				# We use the relative paths for creating the destination directories
+				list(APPEND GO_PACKAGE_COPY_FILES ${PackageItem})
 			endif()
 		endif()
 	endforeach(PackageItem)
@@ -161,22 +164,18 @@ function(ADD_GO_PACKAGE_FOLDER)
 	# Before we can copy all of the files over, we have to make sure that all of the output directories exist
 	foreach(CopyFile ${GO_PACKAGE_COPY_FILES})
 		get_filename_component(CopyFileDirectory ${CopyFile} DIRECTORY)
-		# Add a create this directory
+		# Create this directory in case it doesn't exist
 		add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
 				COMMAND ${CMAKE_COMMAND} -E
-				make_directory ${CMAKE_CURRENT_LIST_DIR}/${GO_PACKAGE_MAIN_FOLDER}/${CopyFileDirectory})
+				make_directory ${GO_PACKAGE_GOPATH}/${CopyFileDirectory})
+		# Copy this file over as well
+		add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
+				COMMAND ${CMAKE_COMMAND} -E
+				copy ${CMAKE_CURRENT_LIST_DIR}/${CopyFile} ${GO_PACKAGE_GOPATH}/${CopyFileDirectory})
 	endforeach(CopyFile)
 
-	# Get the directory of the main folder as the location we are copying files to, this is necessary to ensure
-	# that if nested main folders such as dir1/pkg1 is specified then we copy to the right place
-	get_filename_component(GO_PACKAGE_MAIN_FOLDER_COPY_DEST ${GO_PACKAGE_GOPATH}/${GO_PACKAGE_MAIN_FOLDER} DIRECTORY)
-
-	# Add a custom command to copy the necessary files over
-	add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
-			COMMAND ${CMAKE_COMMAND} -E
-			copy ${GO_PACKAGE_COPY_FILES} ${GO_PACKAGE_MAIN_FOLDER_COPY_DEST}
-			# The copy command depends on all of the files that need aren't to be configured
-			DEPENDS ${GO_PACKAGE_COPY_FILES})
+	# We don't need to show the progress for copying files
+	set_target_properties(${GO_PACKAGE_TARGET}_copy PROPERTIES RULE_MESSAGES OFF)
 
 	# Configure the files requested to be configured
 	foreach(ConfigureFile ${GO_PACKAGE_CONFIGURE_FILES})
