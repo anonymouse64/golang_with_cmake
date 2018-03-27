@@ -38,7 +38,12 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	# otherwise we configure the file and output it to the gopath
 	if(${GO_PROGRAM_CONFIGURE_FILE})
 		message(STATUS "Configuring file ${GO_PROGRAM_MAIN_SOURCE}")
-		configure_file("${GO_PROGRAM_MAIN_SOURCE}" "${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}")
+		# Configure the file first
+		configure_file(${GO_PROGRAM_MAIN_SOURCE} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}.configured)
+		# Now setup the generate call for handling generator expressions
+		file(GENERATE
+			OUTPUT ${GO_PROGRAM_MAIN_SOURCE}
+			INPUT ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}.configured)
 	else()
 		add_custom_command(TARGET ${GO_PROGRAM_TARGET}_copy
 			COMMAND ${CMAKE_COMMAND} -E
@@ -72,7 +77,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	# Now actually setup the build to go build the file inside of the gopath
 	add_custom_command(TARGET ${GO_PROGRAM_TARGET}
 		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_BUILD_ENVIRONMENT} GOPATH=${GOPATH} go build -v 
-		-o "${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET}"
+		-o ${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET}
 		${CMAKE_GO_FLAGS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH}
 		DEPENDS ${GO_PROGRAM_TARGET}_copy)
@@ -97,7 +102,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 		message(STATUS "Enabling testing for ${GO_PROGRAM_TARGET}")
 		# Add a dummy test command to copy the test file over 
 		add_test(NAME ${GO_PROGRAM_TARGET}Test_copy
-			COMMAND "${CMAKE_COMMAND}" -E
+			COMMAND ${CMAKE_COMMAND} -E
 			copy ${MAIN_SRC_ABS_DIR}/${GO_PROGRAM_TEST_FILE_NAME} ${GO_PROGRAM_GOPATH}/${MAIN_SRC_DIR}/${GO_PROGRAM_TEST_FILE_NAME})
 
 		# Add the go test command
@@ -140,6 +145,7 @@ function(ADD_GO_PACKAGE_FOLDER)
 		RELATIVE ${CMAKE_CURRENT_LIST_DIR}
 		${CMAKE_CURRENT_LIST_DIR}/${GO_PACKAGE_MAIN_FOLDER}/* )
 	set(GO_PACKAGE_COPY_FILES "")
+	set(GO_PACKAGE_ABSOLUTE_COPY_FILES "")
 	foreach(PackageItem ${GO_PACKAGE_ALL_ITEMS})
 		# Check this file/directory against all of the specified files that need to be configured
 		set(FILE_FOUND FALSE)
@@ -156,18 +162,34 @@ function(ADD_GO_PACKAGE_FOLDER)
 			if(NOT IS_DIRECTORY  ${PackageItem})
 				# We use the relative paths for creating the destination directories
 				list(APPEND GO_PACKAGE_COPY_FILES ${PackageItem})
+				# The absolute versions are for copying all of the files in one command
+				get_filename_component(ABSOLUTE_PACKAGE_FILE ${PackageItem} ABSOLUTE)
+				list(APPEND GO_PACKAGE_ABSOLUTE_COPY_FILES ${ABSOLUTE_PACKAGE_FILE})
 			endif()
 		endif()
 	endforeach(PackageItem)
 
 
 	# Before we can copy all of the files over, we have to make sure that all of the output directories exist
+	set(GO_PACKAGE_CONFIGURE_DIRS "")
 	foreach(CopyFile ${GO_PACKAGE_COPY_FILES})
 		get_filename_component(CopyFileDirectory ${CopyFile} DIRECTORY)
 		# Create this directory in case it doesn't exist
-		add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
+		# Need to iterate over the list of directories we have previously found that need to be created
+		set(DIR_FOUND FALSE)
+		foreach(DirItem ${GO_PACKAGE_CONFIGURE_DIRS})
+			if(${CopyFileDirectory} STREQUAL ${DirItem})
+				# This item should be configured, not copied
+				set(DIR_FOUND TRUE)
+				break()
+			endif()
+		endforeach()
+		if(NOT ${DIR_FOUND})
+			list(APPEND GO_PACKAGE_CONFIGURE_DIRS ${CopyFileDirectory})
+			add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
 				COMMAND ${CMAKE_COMMAND} -E
 				make_directory ${GO_PACKAGE_GOPATH}/${CopyFileDirectory})
+		endif()
 		# Copy this file over as well
 		add_custom_command(TARGET ${GO_PACKAGE_TARGET}_copy
 				COMMAND ${CMAKE_COMMAND} -E
@@ -177,10 +199,16 @@ function(ADD_GO_PACKAGE_FOLDER)
 	# We don't need to show the progress for copying files
 	set_target_properties(${GO_PACKAGE_TARGET}_copy PROPERTIES RULE_MESSAGES OFF)
 
-	# Configure the files requested to be configured
+	# Configure the files requested to be configured - also call file(GENERATE...) on them, so that we can support
+	# both standard $VAR and @VAR@ as well as generator expressions like $<...>
 	foreach(ConfigureFile ${GO_PACKAGE_CONFIGURE_FILES})
 		message(STATUS "Configuring file ${ConfigureFile}")
-		configure_file("${ConfigureFile}" "${GO_PACKAGE_GOPATH}/${ConfigureFile}")
+		# Configure the file first
+		configure_file(${ConfigureFile} ${GO_PACKAGE_GOPATH}/${ConfigureFile}.configured)
+		# Now setup the generate call
+		file(GENERATE
+			OUTPUT ${GO_PACKAGE_GOPATH}/${ConfigureFile}
+			INPUT ${GO_PACKAGE_GOPATH}/${ConfigureFile}.configured)
 	endforeach(ConfigureFile)
 
 	# Add the actual build target which depends on the files being updated
