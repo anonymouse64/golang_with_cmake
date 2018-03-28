@@ -145,7 +145,6 @@ function(ADD_GO_PACKAGE_FOLDER)
 		RELATIVE ${CMAKE_CURRENT_LIST_DIR}
 		${CMAKE_CURRENT_LIST_DIR}/${GO_PACKAGE_MAIN_FOLDER}/* )
 	set(GO_PACKAGE_COPY_FILES "")
-	set(GO_PACKAGE_ABSOLUTE_COPY_FILES "")
 	foreach(PackageItem ${GO_PACKAGE_ALL_ITEMS})
 		# Check this file/directory against all of the specified files that need to be configured
 		set(FILE_FOUND FALSE)
@@ -162,9 +161,6 @@ function(ADD_GO_PACKAGE_FOLDER)
 			if(NOT IS_DIRECTORY  ${PackageItem})
 				# We use the relative paths for creating the destination directories
 				list(APPEND GO_PACKAGE_COPY_FILES ${PackageItem})
-				# The absolute versions are for copying all of the files in one command
-				get_filename_component(ABSOLUTE_PACKAGE_FILE ${PackageItem} ABSOLUTE)
-				list(APPEND GO_PACKAGE_ABSOLUTE_COPY_FILES ${ABSOLUTE_PACKAGE_FILE})
 			endif()
 		endif()
 	endforeach(PackageItem)
