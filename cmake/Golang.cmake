@@ -19,7 +19,7 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	# First parse the arguments
 	set(options CONFIGURE_FILE)
 	set(oneValueArgs TARGET MAIN_SOURCE IMPORT_PATH)
-	set(multiValueArgs SOURCE_DIRECTORIES TEST_PACKAGES BUILD_ENVIRONMENT GET_ENVIRONMENT)
+	set(multiValueArgs SOURCE_DIRECTORIES TEST_PACKAGES GO_ENVIRONMENT GET_ENVIRONMENT)
 	cmake_parse_arguments(GO_PROGRAM "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
 
 	# This variable tracks the copy of the main file inside the gopath
@@ -70,13 +70,13 @@ function(ADD_GO_INSTALLABLE_PROGRAM)
 	# First before building the target, we automatically fetch all of the dependencies declared 
 	# in the go file using go get
 	add_custom_command(TARGET ${GO_PROGRAM_TARGET}
-		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_GET_ENVIRONMENT} GOPATH=${GOPATH} go get -v -d -t ./...
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_GO_ENVIRONMENT} GOPATH=${GOPATH} go get -v -d -t ./...
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH_MAIN_SOURCE_DIR}
 		DEPENDS ${GO_PROGRAM_TARGET}_copy)
 
 	# Now actually setup the build to go build the file inside of the gopath
 	add_custom_command(TARGET ${GO_PROGRAM_TARGET}
-		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_BUILD_ENVIRONMENT} GOPATH=${GOPATH} go build -v 
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PROGRAM_GO_ENVIRONMENT} GOPATH=${GOPATH} go build -v 
 		-o ${CMAKE_CURRENT_BINARY_DIR}/${GO_PROGRAM_TARGET}
 		${CMAKE_GO_FLAGS} ${GO_PROGRAM_GOPATH}/${GO_PROGRAM_MAIN_SOURCE}
 		WORKING_DIRECTORY ${GO_PROGRAM_GOPATH}
@@ -126,7 +126,7 @@ endfunction(ADD_GO_INSTALLABLE_PROGRAM)
 function(ADD_GO_PACKAGE_FOLDER)
 	# First parse the arguments
 	set(oneValueArgs TARGET MAIN_FOLDER IMPORT_PATH)
-	set(multiValueArgs TEST_PACKAGES CONFIGURE_FILES BUILD_ENVIRONMENT GET_ENVIRONMENT)
+	set(multiValueArgs TEST_PACKAGES CONFIGURE_FILES GO_ENVIRONMENT GET_ENVIRONMENT)
 	cmake_parse_arguments(GO_PACKAGE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
 
 	# This variable tracks the copy of the main file inside the gopath
@@ -218,13 +218,13 @@ function(ADD_GO_PACKAGE_FOLDER)
 	# First before building the target, we automatically fetch all of the dependencies declared 
 	# in the go file using go get
 	add_custom_command(TARGET ${GO_PACKAGE_TARGET}
-		COMMAND ${CMAKE_COMMAND} -E env ${GO_PACKAGE_GET_ENVIRONMENT} GOPATH=${GOPATH} go get -v ${CMAKE_GO_FLAGS} -d -t ./...
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PACKAGE_GO_ENVIRONMENT} GOPATH=${GOPATH} go get -v ${CMAKE_GO_FLAGS} -d -t ./...
 		WORKING_DIRECTORY ${GO_PACKAGE_GOPATH_MAIN_FOLDER}
 		DEPENDS ${GO_PACKAGE_TARGET}_copy)
 
 	# Now actually setup the build to go build all of the packages inside of the package folder
 	add_custom_command(TARGET ${GO_PACKAGE_TARGET}
-		COMMAND ${CMAKE_COMMAND} -E env ${GO_PACKAGE_BUILD_ENVIRONMENT} GOPATH=${GOPATH} go build -v ${CMAKE_GO_FLAGS}  ./...
+		COMMAND ${CMAKE_COMMAND} -E env ${GO_PACKAGE_GO_ENVIRONMENT} GOPATH=${GOPATH} go build -v ${CMAKE_GO_FLAGS}  ./...
 		WORKING_DIRECTORY ${GO_PACKAGE_GOPATH_MAIN_FOLDER}
 		DEPENDS ${GO_PACKAGE_TARGET}_copy)
 
